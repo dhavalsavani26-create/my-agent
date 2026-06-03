@@ -8,6 +8,7 @@ import json
 from dataclasses import asdict
 
 from .agent import BrowserAgent, format_search_results
+from .autonomous import AutonomousBrowserAgent
 
 
 async def _run_open(args: argparse.Namespace) -> None:
@@ -33,6 +34,35 @@ async def _run_extract(args: argparse.Namespace) -> None:
         print(await agent.extract_text(args.selector, max_chars=args.max_chars))
 
 
+async def _run_autonomous(args: argparse.Namespace) -> None:
+    async with AutonomousBrowserAgent(
+        headless=not args.headed,
+        memory_path=args.memory,
+        max_steps=args.max_steps,
+    ) as agent:
+        run = await agent.run(args.objective)
+        payload = {
+            "objective": run.objective,
+            "final_answer": run.final_answer,
+            "progress": run.plan.progress(),
+            "steps": [
+                {
+                    "description": step.description,
+                    "tool_name": step.tool_name,
+                    "arguments": step.arguments,
+                    "status": step.status.value,
+                    "result": step.result,
+                }
+                for step in run.plan.steps
+            ],
+            "events": [asdict(event) for event in run.events],
+        }
+        if args.json:
+            print(json.dumps(payload, indent=2, ensure_ascii=False))
+        else:
+            print(run.final_answer)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Browser automation agent powered by Python and Playwright.")
     parser.add_argument("--headed", action="store_true", help="Show the browser window instead of running headless.")
@@ -54,6 +84,16 @@ def build_parser() -> argparse.ArgumentParser:
     extract_parser.add_argument("--selector", default="body", help="CSS selector to extract from.")
     extract_parser.add_argument("--max-chars", type=int, default=4_000, help="Maximum text characters to print.")
     extract_parser.set_defaults(func=_run_extract)
+
+    run_parser = subparsers.add_parser(
+        "run",
+        help="Run a Manus-style autonomous task with planning, memory, tools, and browser control.",
+    )
+    run_parser.add_argument("objective", help="Natural-language task or URL for the autonomous agent.")
+    run_parser.add_argument("--memory", help="Optional JSONL path for persistent memory across runs.")
+    run_parser.add_argument("--max-steps", type=int, default=8, help="Maximum autonomous loop steps.")
+    run_parser.add_argument("--json", action="store_true", help="Print structured JSON run details.")
+    run_parser.set_defaults(func=_run_autonomous)
 
     return parser
 
