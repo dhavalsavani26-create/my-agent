@@ -2,14 +2,16 @@
 
 AI agent for browser automation, task execution, and workflow management.
 
-## Browser automation agent
+## Manus-style autonomous browser agent
 
-This repository includes a Python browser automation agent built with
+This repository includes a Python autonomous browser agent built with
 [Playwright](https://playwright.dev/python/). It can:
 
-- Open websites and return page summaries.
-- Search Google and extract normalized result titles, URLs, and snippets.
-- Extract visible text and links from pages.
+- Create a bounded task plan from a natural-language objective.
+- Recall and write persistent JSONL memory across runs.
+- Use a tool registry for browser actions, search, extraction, form input, and memory.
+- Control a Playwright browser to open pages, search Google, summarize pages, click, fill, and press keys.
+- Return structured run events, plan progress, observations, and a final answer.
 
 ## Setup
 
@@ -21,6 +23,12 @@ playwright install chromium
 ```
 
 ## CLI usage
+
+Run an autonomous task with planning, memory, tool use, and browser control:
+
+```bash
+browser-agent run "research Playwright browser agents" --memory .agent-memory.jsonl --json
+```
 
 Open a website and print a JSON summary:
 
@@ -47,6 +55,24 @@ browser-agent --headed open https://example.com
 ```
 
 ## Python usage
+
+Autonomous task execution:
+
+```python
+import asyncio
+from browser_agent import AutonomousBrowserAgent
+
+
+async def main():
+    async with AutonomousBrowserAgent(memory_path=".agent-memory.jsonl") as agent:
+        run = await agent.run("https://example.com")
+        print(run.final_answer)
+
+
+asyncio.run(main())
+```
+
+Low-level browser automation remains available:
 
 ```python
 import asyncio

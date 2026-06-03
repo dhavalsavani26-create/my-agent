@@ -1,4 +1,9 @@
+import asyncio
+
 from browser_agent.agent import BrowserAgent, SearchResult, format_search_results
+from browser_agent.memory import MemoryStore
+from browser_agent.planning import Planner, StepStatus
+from browser_agent.tools import ToolRegistry, ToolSpec
 
 
 def test_normalize_url_adds_https_when_scheme_missing():
@@ -22,3 +27,50 @@ def test_format_search_results_includes_title_url_and_snippet():
     assert "1. Example" in formatted
     assert "https://example.com" in formatted
     assert "A sample site" in formatted
+
+
+async def _sample_tool(value="ok"):
+    return {"value": value}
+
+
+def test_memory_store_remembers_and_searches_records():
+    memory = MemoryStore()
+    memory.remember("Browser agents can use tools", kind="fact")
+    memory.remember("Unrelated note", kind="note")
+
+    matches = memory.search("agents tools")
+
+    assert matches[0].content == "Browser agents can use tools"
+    assert memory.recent(1)[0].content == "Unrelated note"
+
+
+def test_planner_creates_url_plan_with_memory_and_browser_steps():
+    plan = Planner().create_plan("example.com")
+
+    assert plan.objective == "example.com"
+    assert plan.next_step().tool_name == "recall_memory"
+    assert [step.tool_name for step in plan.steps] == ["recall_memory", "open_url", "summarize_page", "remember", None]
+    assert plan.progress()[StepStatus.PENDING.value] == 5
+
+
+def test_planner_creates_search_plan_for_natural_language_objective():
+    plan = Planner().create_plan("find browser automation examples")
+
+    assert [step.tool_name for step in plan.steps] == ["recall_memory", "search_web", "summarize_page", "remember", None]
+
+
+def test_tool_registry_calls_registered_async_tool():
+    registry = ToolRegistry()
+    registry.register(ToolSpec("sample", "Sample tool", {"value": "Value"}, _sample_tool))
+
+    result = asyncio.run(registry.call("sample", {"value": "done"}))
+
+    assert result.ok is True
+    assert result.output == {"value": "done"}
+
+
+def test_tool_registry_reports_unknown_tools():
+    result = asyncio.run(ToolRegistry().call("missing"))
+
+    assert result.ok is False
+    assert "Unknown tool" in result.error

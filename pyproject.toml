@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "my-browser-agent"
 version = "0.1.0"
-description = "A Python Playwright browser automation agent for opening sites, Google search, and extraction."
+description = "A Python Playwright autonomous browser agent with planning, memory, tools, and browser control."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = ["playwright>=1.44.0"]
