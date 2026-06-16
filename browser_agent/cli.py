@@ -34,11 +34,19 @@ async def _run_extract(args: argparse.Namespace) -> None:
         print(await agent.extract_text(args.selector, max_chars=args.max_chars))
 
 
+async def _run_screenshot(args: argparse.Namespace) -> None:
+    async with BrowserAgent(headless=not args.headed) as agent:
+        await agent.open(args.url)
+        saved_path = await agent.screenshot(path=args.path, full_page=not args.viewport_only)
+        print(saved_path)
+
+
 async def _run_autonomous(args: argparse.Namespace) -> None:
     async with AutonomousBrowserAgent(
         headless=not args.headed,
         memory_path=args.memory,
         max_steps=args.max_steps,
+        screenshot_dir=args.screenshot_dir,
     ) as agent:
         run = await agent.run(args.objective)
         payload = {
@@ -85,6 +93,16 @@ def build_parser() -> argparse.ArgumentParser:
     extract_parser.add_argument("--max-chars", type=int, default=4_000, help="Maximum text characters to print.")
     extract_parser.set_defaults(func=_run_extract)
 
+    screenshot_parser = subparsers.add_parser("screenshot", help="Open a website and save a PNG screenshot.")
+    screenshot_parser.add_argument("url", help="Website URL to open. https:// is added when omitted.")
+    screenshot_parser.add_argument("path", help="Output PNG path.")
+    screenshot_parser.add_argument(
+        "--viewport-only",
+        action="store_true",
+        help="Capture only the current viewport instead of the full page.",
+    )
+    screenshot_parser.set_defaults(func=_run_screenshot)
+
     run_parser = subparsers.add_parser(
         "run",
         help="Run a Manus-style autonomous task with planning, memory, tools, and browser control.",
@@ -92,6 +110,11 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("objective", help="Natural-language task or URL for the autonomous agent.")
     run_parser.add_argument("--memory", help="Optional JSONL path for persistent memory across runs.")
     run_parser.add_argument("--max-steps", type=int, default=8, help="Maximum autonomous loop steps.")
+    run_parser.add_argument(
+        "--screenshot-dir",
+        default=".agent-screenshots",
+        help="Directory for automatic screenshots after navigation, clicks, submits, important/uncertain actions, and errors.",
+    )
     run_parser.add_argument("--json", action="store_true", help="Print structured JSON run details.")
     run_parser.set_defaults(func=_run_autonomous)
 

@@ -117,6 +117,14 @@ class BrowserToolKit:
         )
         registry.register(
             ToolSpec(
+                name="screenshot",
+                description="Save a PNG screenshot of the active page to disk.",
+                parameters={"path": "Output file path", "full_page": "Capture the full page"},
+                handler=self.screenshot,
+            )
+        )
+        registry.register(
+            ToolSpec(
                 name="click",
                 description="Click an element by CSS selector or by accessible role and name.",
                 parameters={"selector": "CSS selector", "role": "ARIA role", "name": "Accessible name"},
@@ -139,6 +147,14 @@ class BrowserToolKit:
                 handler=self.press,
             )
         )
+        registry.register(
+            ToolSpec(
+                name="submit_form",
+                description="Submit a form located by CSS selector.",
+                parameters={"selector": "CSS selector for the form"},
+                handler=self.submit_form,
+            )
+        )
 
     async def open_url(self, url: str) -> dict[str, Any]:
         await self.browser.open(url)
@@ -156,6 +172,10 @@ class BrowserToolKit:
 
     async def extract_links(self, limit: int = 20) -> list[dict[str, str]]:
         return await self.browser.extract_links(limit=limit)
+
+    async def screenshot(self, path: str, full_page: bool = True) -> dict[str, str]:
+        saved_path = await self.browser.screenshot(path=path, full_page=full_page)
+        return {"path": saved_path}
 
     async def click(self, selector: str | None = None, role: str | None = None, name: str | None = None) -> str:
         page = self.browser._require_page()
@@ -176,3 +196,9 @@ class BrowserToolKit:
         page = self.browser._require_page()
         await page.keyboard.press(key)
         return f"Pressed {key!r}."
+
+    async def submit_form(self, selector: str = "form") -> str:
+        page = self.browser._require_page()
+        form = page.locator(selector).first
+        await form.evaluate("form => form.requestSubmit()")
+        return f"Submitted form {selector!r}."
