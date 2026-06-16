@@ -114,11 +114,15 @@ def test_autonomous_agent_screenshot_policy_matches_browser_actions():
     assert should_capture("navigate", {"url": "https://example.com"}, True)
     assert should_capture("search_web", {"query": "example"}, True)
     assert should_capture("click", {"selector": "button"}, True)
-    assert should_capture("press", {"key": "Enter"}, True)
+    assert should_capture("menu_click", {}, True)
+    assert should_capture("press", {"key": "Tab"}, True)
+    assert should_capture("fill", {"selector": "input", "text": "value"}, True)
     assert should_capture("submit_form", {}, True)
     assert should_capture("extract_text", {}, False)
+    assert should_capture("extract_text", {"important": True}, True)
+    assert should_capture("extract_text", {"uncertain": "yes"}, True)
+    assert should_capture("extract_text", {"capture_screenshot": "true"}, True)
     assert not should_capture("extract_text", {}, True)
-    assert not should_capture("fill", {"selector": "input", "text": "value"}, True)
 
 
 def test_autonomous_agent_screenshot_stem_is_safe():

@@ -113,7 +113,7 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument(
         "--screenshot-dir",
         default=".agent-screenshots",
-        help="Directory for automatic screenshots after navigation, clicks, submits, and errors.",
+        help="Directory for automatic screenshots after navigation, clicks, submits, important/uncertain actions, and errors.",
     )
     run_parser.add_argument("--json", action="store_true", help="Print structured JSON run details.")
     run_parser.set_defaults(func=_run_autonomous)

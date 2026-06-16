@@ -11,7 +11,7 @@ This repository includes a Python autonomous browser agent built with
 - Recall and write persistent JSONL memory across runs.
 - Use a tool registry for browser actions, search, extraction, form input, and memory.
 - Control a Playwright browser to open pages, search Google, summarize pages, take screenshots, click, fill, submit forms, and press keys.
-- Automatically capture screenshots after navigation, clicks, form submits, and tool errors during autonomous runs.
+- Automatically capture screenshots after navigation, clicks, form submits, important/uncertain actions, and tool errors during autonomous runs.
 - Return structured run events, plan progress, observations, and a final answer.
 
 ## Setup
@@ -31,7 +31,7 @@ Run an autonomous task with planning, memory, tool use, and browser control:
 browser-agent run "research Playwright browser agents" --memory .agent-memory.jsonl --json
 ```
 
-Autonomous runs save automatic screenshots in `.agent-screenshots` after page navigation, clicks, form submits, and tool errors. Use `--screenshot-dir` to choose a different output directory.
+Autonomous runs save automatic screenshots in `.agent-screenshots` after page navigation, clicks, form submits, important/uncertain actions, and tool errors. Use `--screenshot-dir` to choose a different output directory.
 
 Open a website and print a JSON summary:
 

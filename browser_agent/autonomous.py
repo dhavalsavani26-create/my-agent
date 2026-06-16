@@ -182,13 +182,36 @@ class AutonomousBrowserAgent:
     def _should_capture_screenshot(tool_name: str, arguments: dict[str, Any], ok: bool) -> bool:
         if not ok:
             return True
-        if tool_name in {"open_url", "search_web", "navigate", "goto", "click"}:
+
+        if AutonomousBrowserAgent._truthy_argument(arguments, "capture_screenshot"):
             return True
-        if tool_name == "press" and str(arguments.get("key", "")).lower() in {"enter", "return"}:
+        if AutonomousBrowserAgent._truthy_argument(arguments, "important"):
             return True
-        if tool_name in {"submit", "submit_form"}:
+        if AutonomousBrowserAgent._truthy_argument(arguments, "uncertain"):
             return True
-        return False
+
+        normalized_tool_name = tool_name.lower().replace("-", "_")
+        important_actions = {
+            "open_url",
+            "search_web",
+            "navigate",
+            "goto",
+            "click",
+            "fill",
+            "press",
+            "submit",
+            "submit_form",
+        }
+        if normalized_tool_name in important_actions:
+            return True
+        return any(action in normalized_tool_name for action in ("click", "navigate", "submit"))
+
+    @staticmethod
+    def _truthy_argument(arguments: dict[str, Any], name: str) -> bool:
+        value = arguments.get(name)
+        if isinstance(value, str):
+            return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+        return bool(value)
 
     @staticmethod
     def _screenshot_stem(index: int, tool_name: str, ok: bool) -> str:
