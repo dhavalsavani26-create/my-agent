@@ -132,3 +132,28 @@ def test_autonomous_agent_screenshot_stem_is_safe():
 
     assert stem.startswith("002-")
     assert stem.endswith("-click-button-ok")
+
+
+def test_autonomous_agent_screenshot_metadata_matches_expected_shape():
+    from browser_agent.autonomous import AutonomousBrowserAgent
+
+    metadata = AutonomousBrowserAgent._screenshot_metadata(
+        "click",
+        {"reason": "click on login button", "confidence": 0.8},
+        True,
+    )
+
+    assert metadata == {
+        "path": "",
+        "reason": "click on login button",
+        "trigger": "click",
+        "confidence": 0.8,
+    }
+
+
+def test_autonomous_agent_screenshot_confidence_is_clamped():
+    from browser_agent.autonomous import AutonomousBrowserAgent
+
+    assert AutonomousBrowserAgent._screenshot_confidence({"confidence": 2}, True) == 1.0
+    assert AutonomousBrowserAgent._screenshot_confidence({"confidence": -1}, True) == 0.0
+    assert AutonomousBrowserAgent._screenshot_confidence({"confidence": "unknown"}, True) == 0.8

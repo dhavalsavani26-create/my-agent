@@ -130,10 +130,10 @@ class AutonomousBrowserAgent:
             step.result = result.as_text()
             step.status = StepStatus.COMPLETED if result.ok else StepStatus.FAILED
             event_data: dict[str, Any] = {"result": result.as_text()}
-            screenshot_path = await self._maybe_capture_step_screenshot(step.tool_name, step.arguments, result)
-            if screenshot_path:
-                event_data["screenshot"] = screenshot_path
-                step.result = f"{step.result}\nScreenshot: {screenshot_path}"
+            screenshot = await self._maybe_capture_step_screenshot(step.tool_name, step.arguments, result)
+            if screenshot:
+                event_data["screenshot"] = screenshot
+                step.result = f"{step.result}\nScreenshot: {screenshot}"
             events.append(
                 AgentEvent(
                     "tool_result",
@@ -144,8 +144,8 @@ class AutonomousBrowserAgent:
 
             if not result.ok:
                 metadata = {"tool_name": step.tool_name}
-                if screenshot_path:
-                    metadata["screenshot"] = screenshot_path
+                if screenshot:
+                    metadata["screenshot"] = screenshot
                 self.memory.remember(
                     f"Tool {step.tool_name} failed while pursuing {task_plan.objective}: {result.error}",
                     kind="error",
@@ -166,45 +166,83 @@ class AutonomousBrowserAgent:
         tool_name: str,
         arguments: dict[str, Any],
         result: ToolResult,
-    ) -> str:
-        if not self._should_capture_screenshot(tool_name, arguments, result.ok):
-            return ""
+    ) -> dict[str, Any] | None:
+        screenshot = self._screenshot_metadata(tool_name, arguments, result.ok)
+        if screenshot is None:
+            return None
 
         self._screenshot_count += 1
         stem = self._screenshot_stem(self._screenshot_count, tool_name, result.ok)
         path = self.screenshot_dir / f"{stem}.png"
         try:
-            return await self.browser.screenshot(path=path, full_page=True)
+            screenshot["path"] = await self.browser.screenshot(path=path, full_page=True)
         except Exception as exc:  # Screenshot capture must not mask the original tool result.
-            return f"screenshot failed: {exc}"
+            screenshot["path"] = ""
+            screenshot["error"] = f"screenshot failed: {exc}"
+        return screenshot
 
-    @staticmethod
-    def _should_capture_screenshot(tool_name: str, arguments: dict[str, Any], ok: bool) -> bool:
+    @classmethod
+    def _should_capture_screenshot(cls, tool_name: str, arguments: dict[str, Any], ok: bool) -> bool:
+        return cls._screenshot_metadata(tool_name, arguments, ok) is not None
+
+    @classmethod
+    def _screenshot_metadata(cls, tool_name: str, arguments: dict[str, Any], ok: bool) -> dict[str, Any] | None:
+        trigger = cls._screenshot_trigger(tool_name, arguments, ok)
+        if trigger is None:
+            return None
+
+        return {
+            "path": "",
+            "reason": str(arguments.get("reason") or cls._default_screenshot_reason(trigger, ok)),
+            "trigger": trigger,
+            "confidence": cls._screenshot_confidence(arguments, ok),
+        }
+
+    @classmethod
+    def _screenshot_trigger(cls, tool_name: str, arguments: dict[str, Any], ok: bool) -> str | None:
         if not ok:
-            return True
-
-        if AutonomousBrowserAgent._truthy_argument(arguments, "capture_screenshot"):
-            return True
-        if AutonomousBrowserAgent._truthy_argument(arguments, "important"):
-            return True
-        if AutonomousBrowserAgent._truthy_argument(arguments, "uncertain"):
-            return True
+            return "error"
+        if cls._truthy_argument(arguments, "capture_screenshot"):
+            return str(arguments.get("trigger") or "explicit")
+        if cls._truthy_argument(arguments, "important"):
+            return str(arguments.get("trigger") or "important")
+        if cls._truthy_argument(arguments, "uncertain"):
+            return str(arguments.get("trigger") or "uncertain")
 
         normalized_tool_name = tool_name.lower().replace("-", "_")
-        important_actions = {
-            "open_url",
-            "search_web",
-            "navigate",
-            "goto",
-            "click",
-            "fill",
-            "press",
-            "submit",
-            "submit_form",
+        trigger_by_tool = {
+            "open_url": "navigate",
+            "search_web": "navigate",
+            "navigate": "navigate",
+            "goto": "navigate",
+            "click": "click",
+            "fill": "important",
+            "press": "important",
+            "submit": "submit",
+            "submit_form": "submit",
         }
-        if normalized_tool_name in important_actions:
-            return True
-        return any(action in normalized_tool_name for action in ("click", "navigate", "submit"))
+        if normalized_tool_name in trigger_by_tool:
+            return trigger_by_tool[normalized_tool_name]
+        for trigger in ("click", "navigate", "submit"):
+            if trigger in normalized_tool_name:
+                return trigger
+        return None
+
+    @staticmethod
+    def _default_screenshot_reason(trigger: str, ok: bool) -> str:
+        if not ok:
+            return "tool error"
+        return f"{trigger} action"
+
+    @staticmethod
+    def _screenshot_confidence(arguments: dict[str, Any], ok: bool) -> float:
+        if "confidence" in arguments:
+            try:
+                confidence = float(arguments["confidence"])
+            except (TypeError, ValueError):
+                return 0.8
+            return max(0.0, min(1.0, confidence))
+        return 1.0 if ok else 0.0
 
     @staticmethod
     def _truthy_argument(arguments: dict[str, Any], name: str) -> bool:
