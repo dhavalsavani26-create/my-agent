@@ -9,6 +9,7 @@ or other Python code can focus on the task being automated.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Iterable
 from urllib.parse import quote_plus
 
@@ -120,6 +121,15 @@ class BrowserAgent:
             if results:
                 return results[:limit]
         return []
+
+    async def screenshot(self, *, path: str | Path, full_page: bool = True) -> str:
+        """Save a PNG screenshot of the current page and return the file path."""
+
+        page = self._require_page()
+        screenshot_path = Path(path).expanduser()
+        screenshot_path.parent.mkdir(parents=True, exist_ok=True)
+        await page.screenshot(path=str(screenshot_path), full_page=full_page)
+        return str(screenshot_path)
 
     async def extract_text(self, selector: str = "body", *, max_chars: int = 4_000) -> str:
         """Extract visible text from the current page or selector."""

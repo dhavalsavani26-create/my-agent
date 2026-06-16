@@ -10,7 +10,7 @@ This repository includes a Python autonomous browser agent built with
 - Create a bounded task plan from a natural-language objective.
 - Recall and write persistent JSONL memory across runs.
 - Use a tool registry for browser actions, search, extraction, form input, and memory.
-- Control a Playwright browser to open pages, search Google, summarize pages, click, fill, and press keys.
+- Control a Playwright browser to open pages, search Google, summarize pages, take screenshots, click, fill, and press keys.
 - Return structured run events, plan progress, observations, and a final answer.
 
 ## Setup
@@ -48,6 +48,12 @@ Extract text from a page selector:
 browser-agent extract https://example.com --selector body --max-chars 1000
 ```
 
+Save a full-page PNG screenshot:
+
+```bash
+browser-agent screenshot https://example.com test.png
+```
+
 Add `--headed` before the subcommand to watch the browser run:
 
 ```bash
@@ -82,6 +88,7 @@ from browser_agent import BrowserAgent
 async def main():
     async with BrowserAgent(headless=True) as agent:
         await agent.open("https://example.com")
+        await agent.screenshot(path="test.png", full_page=True)
         print(await agent.extract_text("h1"))
 
         results = await agent.google_search("OpenAI", limit=3)

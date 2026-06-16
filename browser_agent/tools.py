@@ -117,6 +117,14 @@ class BrowserToolKit:
         )
         registry.register(
             ToolSpec(
+                name="screenshot",
+                description="Save a PNG screenshot of the active page to disk.",
+                parameters={"path": "Output file path", "full_page": "Capture the full page"},
+                handler=self.screenshot,
+            )
+        )
+        registry.register(
+            ToolSpec(
                 name="click",
                 description="Click an element by CSS selector or by accessible role and name.",
                 parameters={"selector": "CSS selector", "role": "ARIA role", "name": "Accessible name"},
@@ -156,6 +164,10 @@ class BrowserToolKit:
 
     async def extract_links(self, limit: int = 20) -> list[dict[str, str]]:
         return await self.browser.extract_links(limit=limit)
+
+    async def screenshot(self, path: str, full_page: bool = True) -> dict[str, str]:
+        saved_path = await self.browser.screenshot(path=path, full_page=full_page)
+        return {"path": saved_path}
 
     async def click(self, selector: str | None = None, role: str | None = None, name: str | None = None) -> str:
         page = self.browser._require_page()

@@ -3,7 +3,7 @@ import asyncio
 from browser_agent.agent import BrowserAgent, SearchResult, format_search_results
 from browser_agent.memory import MemoryStore
 from browser_agent.planning import Planner, StepStatus
-from browser_agent.tools import ToolRegistry, ToolSpec
+from browser_agent.tools import BrowserToolKit, ToolRegistry, ToolSpec
 
 
 def test_normalize_url_adds_https_when_scheme_missing():
@@ -74,3 +74,31 @@ def test_tool_registry_reports_unknown_tools():
 
     assert result.ok is False
     assert "Unknown tool" in result.error
+
+
+class _FakePage:
+    def __init__(self):
+        self.screenshot_args = None
+
+    async def screenshot(self, **kwargs):
+        self.screenshot_args = kwargs
+
+
+def test_browser_agent_screenshot_saves_png_path(tmp_path):
+    agent = BrowserAgent()
+    fake_page = _FakePage()
+    agent.page = fake_page
+    path = tmp_path / "screens" / "test.png"
+
+    saved_path = asyncio.run(agent.screenshot(path=str(path), full_page=False))
+
+    assert saved_path == str(path)
+    assert path.parent.exists()
+    assert fake_page.screenshot_args == {"path": str(path), "full_page": False}
+
+
+def test_toolkit_registers_screenshot_tool():
+    registry = ToolRegistry()
+    BrowserToolKit(BrowserAgent()).register(registry)
+
+    assert "screenshot" in registry.names()

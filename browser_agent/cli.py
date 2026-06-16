@@ -34,6 +34,13 @@ async def _run_extract(args: argparse.Namespace) -> None:
         print(await agent.extract_text(args.selector, max_chars=args.max_chars))
 
 
+async def _run_screenshot(args: argparse.Namespace) -> None:
+    async with BrowserAgent(headless=not args.headed) as agent:
+        await agent.open(args.url)
+        saved_path = await agent.screenshot(path=args.path, full_page=not args.viewport_only)
+        print(saved_path)
+
+
 async def _run_autonomous(args: argparse.Namespace) -> None:
     async with AutonomousBrowserAgent(
         headless=not args.headed,
@@ -84,6 +91,16 @@ def build_parser() -> argparse.ArgumentParser:
     extract_parser.add_argument("--selector", default="body", help="CSS selector to extract from.")
     extract_parser.add_argument("--max-chars", type=int, default=4_000, help="Maximum text characters to print.")
     extract_parser.set_defaults(func=_run_extract)
+
+    screenshot_parser = subparsers.add_parser("screenshot", help="Open a website and save a PNG screenshot.")
+    screenshot_parser.add_argument("url", help="Website URL to open. https:// is added when omitted.")
+    screenshot_parser.add_argument("path", help="Output PNG path.")
+    screenshot_parser.add_argument(
+        "--viewport-only",
+        action="store_true",
+        help="Capture only the current viewport instead of the full page.",
+    )
+    screenshot_parser.set_defaults(func=_run_screenshot)
 
     run_parser = subparsers.add_parser(
         "run",
