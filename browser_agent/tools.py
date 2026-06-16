@@ -147,6 +147,14 @@ class BrowserToolKit:
                 handler=self.press,
             )
         )
+        registry.register(
+            ToolSpec(
+                name="submit_form",
+                description="Submit a form located by CSS selector.",
+                parameters={"selector": "CSS selector for the form"},
+                handler=self.submit_form,
+            )
+        )
 
     async def open_url(self, url: str) -> dict[str, Any]:
         await self.browser.open(url)
@@ -188,3 +196,9 @@ class BrowserToolKit:
         page = self.browser._require_page()
         await page.keyboard.press(key)
         return f"Pressed {key!r}."
+
+    async def submit_form(self, selector: str = "form") -> str:
+        page = self.browser._require_page()
+        form = page.locator(selector).first
+        await form.evaluate("form => form.requestSubmit()")
+        return f"Submitted form {selector!r}."

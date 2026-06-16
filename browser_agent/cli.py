@@ -46,6 +46,7 @@ async def _run_autonomous(args: argparse.Namespace) -> None:
         headless=not args.headed,
         memory_path=args.memory,
         max_steps=args.max_steps,
+        screenshot_dir=args.screenshot_dir,
     ) as agent:
         run = await agent.run(args.objective)
         payload = {
@@ -109,6 +110,11 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("objective", help="Natural-language task or URL for the autonomous agent.")
     run_parser.add_argument("--memory", help="Optional JSONL path for persistent memory across runs.")
     run_parser.add_argument("--max-steps", type=int, default=8, help="Maximum autonomous loop steps.")
+    run_parser.add_argument(
+        "--screenshot-dir",
+        default=".agent-screenshots",
+        help="Directory for automatic screenshots after navigation, clicks, submits, and errors.",
+    )
     run_parser.add_argument("--json", action="store_true", help="Print structured JSON run details.")
     run_parser.set_defaults(func=_run_autonomous)
 

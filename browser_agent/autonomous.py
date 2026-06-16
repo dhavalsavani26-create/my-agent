@@ -7,6 +7,9 @@ bounded execution loop on top of :class:`browser_agent.agent.BrowserAgent`.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
+import re
+from pathlib import Path
 from typing import Any
 
 from .agent import BrowserAgent
@@ -53,6 +56,7 @@ class AutonomousBrowserAgent:
         memory_path: str | None = None,
         max_steps: int = 8,
         planner: Planner | None = None,
+        screenshot_dir: str | Path = ".agent-screenshots",
     ) -> None:
         self.browser = BrowserAgent(
             headless=headless,
@@ -63,6 +67,8 @@ class AutonomousBrowserAgent:
         self.memory = MemoryStore(memory_path)
         self.max_steps = max_steps
         self.planner = planner or Planner()
+        self.screenshot_dir = Path(screenshot_dir).expanduser()
+        self._screenshot_count = 0
         self.tools = ToolRegistry()
         BrowserToolKit(self.browser).register(self.tools)
         self._register_memory_tools()
@@ -123,19 +129,27 @@ class AutonomousBrowserAgent:
             observations.append(result)
             step.result = result.as_text()
             step.status = StepStatus.COMPLETED if result.ok else StepStatus.FAILED
+            event_data: dict[str, Any] = {"result": result.as_text()}
+            screenshot_path = await self._maybe_capture_step_screenshot(step.tool_name, step.arguments, result)
+            if screenshot_path:
+                event_data["screenshot"] = screenshot_path
+                step.result = f"{step.result}\nScreenshot: {screenshot_path}"
             events.append(
                 AgentEvent(
                     "tool_result",
                     f"{step.tool_name} {'succeeded' if result.ok else 'failed'}.",
-                    {"result": result.as_text()},
+                    event_data,
                 )
             )
 
             if not result.ok:
+                metadata = {"tool_name": step.tool_name}
+                if screenshot_path:
+                    metadata["screenshot"] = screenshot_path
                 self.memory.remember(
                     f"Tool {step.tool_name} failed while pursuing {task_plan.objective}: {result.error}",
                     kind="error",
-                    metadata={"tool_name": step.tool_name},
+                    metadata=metadata,
                 )
 
         final_answer = self._final_step_result(task_plan) or self._compose_final_answer(task_plan.objective, observations)
@@ -146,6 +160,42 @@ class AutonomousBrowserAgent:
             events=events,
             memories=self.memory.recent(limit=10),
         )
+
+    async def _maybe_capture_step_screenshot(
+        self,
+        tool_name: str,
+        arguments: dict[str, Any],
+        result: ToolResult,
+    ) -> str:
+        if not self._should_capture_screenshot(tool_name, arguments, result.ok):
+            return ""
+
+        self._screenshot_count += 1
+        stem = self._screenshot_stem(self._screenshot_count, tool_name, result.ok)
+        path = self.screenshot_dir / f"{stem}.png"
+        try:
+            return await self.browser.screenshot(path=path, full_page=True)
+        except Exception as exc:  # Screenshot capture must not mask the original tool result.
+            return f"screenshot failed: {exc}"
+
+    @staticmethod
+    def _should_capture_screenshot(tool_name: str, arguments: dict[str, Any], ok: bool) -> bool:
+        if not ok:
+            return True
+        if tool_name in {"open_url", "search_web", "navigate", "goto", "click"}:
+            return True
+        if tool_name == "press" and str(arguments.get("key", "")).lower() in {"enter", "return"}:
+            return True
+        if tool_name in {"submit", "submit_form"}:
+            return True
+        return False
+
+    @staticmethod
+    def _screenshot_stem(index: int, tool_name: str, ok: bool) -> str:
+        timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
+        safe_tool_name = re.sub(r"[^a-zA-Z0-9_-]+", "-", tool_name).strip("-") or "tool"
+        status = "ok" if ok else "error"
+        return f"{index:03d}-{timestamp}-{safe_tool_name}-{status}"
 
     def _register_memory_tools(self) -> None:
         async def remember(content: str, kind: str = "observation", metadata: dict[str, Any] | None = None) -> dict[str, Any]:

@@ -102,3 +102,29 @@ def test_toolkit_registers_screenshot_tool():
     BrowserToolKit(BrowserAgent()).register(registry)
 
     assert "screenshot" in registry.names()
+    assert "submit_form" in registry.names()
+
+
+def test_autonomous_agent_screenshot_policy_matches_browser_actions():
+    from browser_agent.autonomous import AutonomousBrowserAgent
+
+    should_capture = AutonomousBrowserAgent._should_capture_screenshot
+
+    assert should_capture("open_url", {"url": "https://example.com"}, True)
+    assert should_capture("navigate", {"url": "https://example.com"}, True)
+    assert should_capture("search_web", {"query": "example"}, True)
+    assert should_capture("click", {"selector": "button"}, True)
+    assert should_capture("press", {"key": "Enter"}, True)
+    assert should_capture("submit_form", {}, True)
+    assert should_capture("extract_text", {}, False)
+    assert not should_capture("extract_text", {}, True)
+    assert not should_capture("fill", {"selector": "input", "text": "value"}, True)
+
+
+def test_autonomous_agent_screenshot_stem_is_safe():
+    from browser_agent.autonomous import AutonomousBrowserAgent
+
+    stem = AutonomousBrowserAgent._screenshot_stem(2, "click button!", True)
+
+    assert stem.startswith("002-")
+    assert stem.endswith("-click-button-ok")
